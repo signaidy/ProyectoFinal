@@ -23,7 +23,7 @@ public:
     static std::vector<ActorData> getMovieCast(int movieId, int limit = 10, const std::vector<int>& excludeIds = {});
 
 private:
-    static constexpr const char* api_key = "<TU_API_KEY_HERE>";
+    static constexpr const char* api_key = "a1bb56cdefd8d5a9d0eb8c4928eb530d";
     static constexpr const char* base_url = "https://api.themoviedb.org/3";
 
     static std::string buildURL(const std::string& endpoint, const std::string& query = "");
