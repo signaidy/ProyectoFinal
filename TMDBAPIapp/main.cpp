@@ -96,6 +96,8 @@ int main() {
     if (graph.exportToDot(outputFile)) {
         std::cout << "Grafo exportado a " << outputFile 
               << ". Generando imagen SVG con Graphviz...\n";
+              
+        // Ejecutar comando de sistema para generar SVG usando Graphviz
         int result = std::system("dot -Tsvg colaboraciones.dot -o grafo.svg");
         if (result == 0) {
             std::cout << "Imagen generada exitosamente: grafo.svg\n";

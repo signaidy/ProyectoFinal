@@ -24,15 +24,11 @@ COPY src ./src
 COPY data ./data
 
 
-# Construcción
+# Construcción & Salidas
 RUN mkdir -p build && cd build && \
 cmake -DPython3_ROOT_DIR=/usr -DPython3_EXECUTABLE=/usr/bin/python3 .. && \
-cmake --build . -j
-
-
-# Salidas
-RUN mkdir -p /app/outputs
-
+cmake --build . -j \
+mkdir -p /app/outputs
 
 # Comando por defecto: ejecuta el binario (carga CSV, crea índices y genera PNG)
 CMD ["/app/build/incidents_analytics"]

@@ -3,10 +3,12 @@
 #include <algorithm>
 #include <fstream>
 
+// Agrega un actor (nodo) al grafo
 void Graph::addActor(int id, const std::string& name) {
     actors.emplace(id, name);
 }
 
+// Agrega una colaboración (arista) entre dos actores con la película más reciente
 void Graph::addCollaboration(int id1, int id2, const std::string& movieTitle, int movieYear) {
     if (id1 == id2) return; // no loops
     int a = std::min(id1, id2);
@@ -22,14 +24,17 @@ void Graph::addCollaboration(int id1, int id2, const std::string& movieTitle, in
     }
 }
 
+// Devuelve el número de actores (nodos) en el grafo
 size_t Graph::numActors() const {
     return actors.size();
 }
 
+// Devuelve el número de colaboraciones (aristas) en el grafo
 size_t Graph::numCollaborations() const {
     return edgeLabels.size();
 }
 
+// Exporta el grafo al formato DOT para visualización con Graphviz
 bool Graph::exportToDot(const std::string& filename) const {
     std::ofstream out(filename);
     if (!out.is_open()) return false;
