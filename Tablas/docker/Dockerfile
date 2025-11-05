@@ -8,13 +8,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
 build-essential cmake git curl \
 libsqlite3-dev sqlite3 \
-python3 python3-dev python3-pip \
+python3 python3-dev python3-pip python3-numpy python3-matplotlib \
 && rm -rf /var/lib/apt/lists/*
-
-
-# Libs Python para gráficos
-RUN pip3 install --no-cache-dir matplotlib numpy
-
 
 # App
 WORKDIR /app
@@ -27,7 +22,7 @@ COPY data ./data
 # Construcción & Salidas
 RUN mkdir -p build && cd build && \
 cmake -DPython3_ROOT_DIR=/usr -DPython3_EXECUTABLE=/usr/bin/python3 .. && \
-cmake --build . -j \
+cmake --build . -j && \
 mkdir -p /app/outputs
 
 # Comando por defecto: ejecuta el binario (carga CSV, crea índices y genera PNG)

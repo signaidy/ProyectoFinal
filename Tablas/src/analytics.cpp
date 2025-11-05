@@ -2,7 +2,7 @@
 #include <stdexcept>
 #include <iostream>
 
-
+// Ejecuta una consulta SQL que devuelve un único valor double
 static void exec_scalar_double(sqlite3* db, const std::string& sql, double& out){
     sqlite3_stmt* st=nullptr;
     if(sqlite3_prepare_v2(db, sql.c_str(), -1, &st, nullptr)!=SQLITE_OK)
@@ -12,7 +12,7 @@ static void exec_scalar_double(sqlite3* db, const std::string& sql, double& out)
     sqlite3_finalize(st);
 }
 
-
+// Ejecuta una consulta SQL que devuelve filas de clave (string) y valor (double)
 static void exec_rs_kv(sqlite3* db, const std::string& sql, ResultSetKV& rs){
     sqlite3_stmt* st=nullptr;
     if(sqlite3_prepare_v2(db, sql.c_str(), -1, &st, nullptr)!=SQLITE_OK)
@@ -25,7 +25,7 @@ static void exec_rs_kv(sqlite3* db, const std::string& sql, ResultSetKV& rs){
     sqlite3_finalize(st);
 }
 
-
+// Ejecuta una consulta SQL que devuelve una serie de tiempo (año, valor double)
 static void exec_ts(sqlite3* db, const std::string& sql, TimeSeries& ts){
     sqlite3_stmt* st=nullptr;
     if(sqlite3_prepare_v2(db, sql.c_str(), -1, &st, nullptr)!=SQLITE_OK)
@@ -38,13 +38,13 @@ static void exec_ts(sqlite3* db, const std::string& sql, TimeSeries& ts){
     sqlite3_finalize(st);
 }
 
-
+// Constructor: abre la base de datos SQLite
 Analytics::Analytics(const std::string& db_path){
     if(sqlite3_open(db_path.c_str(), &db_)!=SQLITE_OK)
         throw std::runtime_error("open db: "+std::string(sqlite3_errmsg(db_)));
 }
 
-
+// Destructor: cierra la base de datos SQLite
 Analytics::~Analytics(){ if(db_) sqlite3_close(db_); }
 
 
@@ -89,7 +89,7 @@ ResultSetKV Analytics::detection_by_avg_arrests(size_t topN){
         GROUP BY d.detection
         HAVING COUNT(*) > 0
         ORDER BY avg_arrest DESC
-        LIMIT ")SQL" + std::to_string(topN) + ";";
+        LIMIT )SQL" + std::to_string(topN) + ";";
     exec_rs_kv(db_, sql, rs);
     return rs;
 }
@@ -120,7 +120,7 @@ ResultSetKV Analytics::categories_with_longest_sentences_days(size_t topN){
         FROM norm
         GROUP BY category
         ORDER BY avg_days DESC
-        LIMIT ")SQL" + std::to_string(topN) + ";";
+        LIMIT )SQL" + std::to_string(topN) + ";";
     exec_rs_kv(db_, sql, rs);
     return rs;
 }

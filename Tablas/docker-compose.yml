@@ -8,8 +8,3 @@ services:
     volumes:
       - ./data:/app/data:ro
       - ./outputs:/app/outputs
-    # Para CPUs multi-core, deja que C++ use varios hilos
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'

@@ -2,8 +2,8 @@ UnU
 
 # Incidents Analytics (SQLite + C++ + Docker)
 
-
 Este proyecto:
+
 1) Crea tablas `incidents`, `details`, `outcomes` en SQLite.
 2) Carga **paralelamente** (hilos + semáforo) los CSV del directorio `data/`.
 3) Crea índices en `report_id`.
@@ -16,16 +16,13 @@ Este proyecto:
 
 
 ## Instrucciones rápidas
+
 ```bash
-# 1) Clona/copias el repo y coloca tus CSV en ./data
-# (usa exactamente: incidents.csv, details.csv, outcomes.csv)
-
-
-# 2) Construye y ejecuta
 docker compose build
 docker compose up --remove-orphans --force-recreate
+```
 
+# Resultados
 
-# 3) Resultados
-# - Base de datos: ./outputs/incidents.db
-# - Gráficas: ./outputs/*.png
+- Base de datos: ./outputs/incidents.db
+- Gráficas: ./outputs/*.png
