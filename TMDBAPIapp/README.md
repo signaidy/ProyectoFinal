@@ -1,4 +1,6 @@
-UnU# Proyecto: Grafo de Colaboración de Actores (TMDB + C++)
+UnU
+
+# Proyecto: Grafo de Colaboración de Actores (TMDB + C++)
 
 Este proyecto construye y visualiza un grafo de colaboración de actores utilizando datos de la API de The Movie Database (TMDB). El grafo muestra qué actores han trabajado juntos, etiquetando cada arista con la película más reciente en la que colaboraron. Se implementa en **C++20** y usa **Graphviz** para visualizar el grafo resultante.
 
