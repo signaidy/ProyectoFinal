@@ -1,0 +1,7 @@
+services:
+  grafo-cpp:
+    build: .
+    container_name: tmdb-grafo-cpp
+    volumes:
+      - .:/app
+    command: ["./grafo-cpp"]

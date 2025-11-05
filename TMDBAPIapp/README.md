@@ -1,5 +1,3 @@
-UnU
-
 # Proyecto: Grafo de Colaboración de Actores (TMDB + C++)
 
 Este proyecto construye y visualiza un grafo de colaboración de actores utilizando datos de la API de The Movie Database (TMDB). El grafo muestra qué actores han trabajado juntos, etiquetando cada arista con la película más reciente en la que colaboraron. Se implementa en **C++20** y usa **Graphviz** para visualizar el grafo resultante.
@@ -8,43 +6,114 @@ Este proyecto construye y visualiza un grafo de colaboración de actores utiliza
 
 ## 🔧 Requisitos
 
-* **Compilador:** Visual Studio 2019/2022 (MSVC) con soporte C++20.
-* **Dependencias externas:**
+- **Docker + Docker Compose** (recomendado para evitar instalar dependencias manualmente)
+- O bien:
+  - **Compilador:** Visual Studio 2019/2022 (MSVC) con soporte C++20.
+  - **Dependencias externas:**
+    - [`cpr`](https://github.com/libcpr/cpr) — para peticiones HTTP.
+    - [`nlohmann/json`](https://github.com/nlohmann/json) — para parseo de JSON.
+    - [`Graphviz`](https://graphviz.org/) — para visualizar el archivo `.dot` generado.
 
-  * [`cpr`](https://github.com/libcpr/cpr) — para peticiones HTTP.
-  * [`nlohmann/json`](https://github.com/nlohmann/json) — para parseo de JSON.
-  * [`Graphviz`](https://graphviz.org/) — para visualizar el archivo `.dot` generado.
+---
 
-### Instalación de dependencias vía vcpkg (recomendado)
+## 🚀 Uso con Docker
+
+### 1. Agrega tu API Key en el código
+
+Abre `TMDBAPIUtils.h` y reemplaza:
+
+```cpp
+static constexpr const char* api_key = "<TU_API_KEY_HERE>";
+````
+
+### 2. Ejecuta todo el flujo
 
 ```bash
-# Instala vcpkg si no lo tienes ya
-https://github.com/microsoft/vcpkg#quick-start
+docker compose up --build
+```
 
-# Instala las bibliotecas necesarias
+Esto:
+
+* Descargará dependencias (`cpr`, `nlohmann/json`, `graphviz`)
+* Compilará el proyecto en C++
+* Ejecutará el binario `grafo-cpp`
+* Generará `colaboraciones.dot` y `grafo.png`
+
+### 3. Visualiza el grafo generado
+
+Abre `grafo.png` desde tu sistema operativo para ver el grafo de colaboraciones de actores.
+
+---
+
+## 🛠️ Uso sin Docker (instalación manual)
+
+### 1. Instala las dependencias manualmente
+
+#### En Windows (vía vcpkg)
+
+```bash
+git clone https://github.com/microsoft/vcpkg
+cd vcpkg
+.\bootstrap-vcpkg.bat
 vcpkg install cpr nlohmann-json
+```
+
+#### En Linux (apt)
+
+```bash
+sudo apt update
+sudo apt install build-essential cmake libcurl4-openssl-dev libssl-dev graphviz
+```
+
+Luego instala las dependencias:
+
+```bash
+git clone https://github.com/libcpr/cpr.git
+cd cpr && mkdir build && cd build
+cmake .. -DCMAKE_USE_OPENSSL=ON
+make -j && sudo make install
+```
+
+```bash
+git clone https://github.com/nlohmann/json.git
+cd json && mkdir build && cd build
+cmake .. && make -j && sudo make install
 ```
 
 ---
 
-## 🚀 Compilación (usando MSVC + vcpkg)
+### 2. Agrega tu API Key
 
-### 1. Clona el repositorio y navega al directorio del proyecto
+Edita el archivo `TMDBAPIUtils.h` y reemplaza:
 
+```cpp
+static constexpr const char* api_key = "<TU_API_KEY_HERE>";
 ```
-git clone <este-proyecto>
-cd tmdb-grafo-cpp
-```
 
-### 2. Compila con el siguiente comando
+---
+
+### 3. Compila el proyecto
 
 ```bash
-cl /std:c++20 /I"<ruta-a-vcpkg>\installed\x64-windows\include" \
-    main.cpp TMDBAPIUtils.cpp Graph.cpp \
-    /link /LIBPATH:"<ruta-a-vcpkg>\installed\x64-windows\lib" cpr.lib
+g++ -std=c++20 main.cpp TMDBAPIUtils.cpp Graph.cpp -o grafo-cpp -lcpr -lssl -lcrypto -pthread
 ```
 
-Reemplaza `<ruta-a-vcpkg>` con el path correcto en tu máquina.
+O si estás en Windows usando MSVC:
+
+```bash
+cl /std:c++20 main.cpp TMDBAPIUtils.cpp Graph.cpp /I\"<ruta a vcpkg>/installed/x64-windows/include\" /link /LIBPATH:\"<ruta a vcpkg>/installed/x64-windows/lib\" cpr.lib
+```
+
+---
+
+### 4. Ejecuta y visualiza
+
+```bash
+./grafo-cpp
+dot -Tpng colaboraciones.dot -o grafo.png
+```
+
+Abre `grafo.png` para ver el resultado.
 
 ---
 
@@ -58,27 +127,21 @@ Reemplaza `<ruta-a-vcpkg>` con el path correcto en tu máquina.
 
 ---
 
-## 📈 Visualización con Graphviz
+## 📈 Visualización con Graphviz (modo local)
 
-Una vez generado el archivo `.dot`, puedes renderizarlo con:
+Una vez generado el archivo `.dot`, si usas instalación local:
 
 ```bash
 dot -Tpng colaboraciones.dot -o grafo.png
-```
-
-O si prefieres SVG:
-
-```bash
-dot -Tsvg colaboraciones.dot -o grafo.svg
 ```
 
 ---
 
 ## 📝 Notas adicionales
 
-* La API Key de TMDB debe ser insertada manualmente en `TMDBAPIUtils.h`.
-* Se utilizan threads y semáforo (C++20) para mejorar rendimiento de llamadas HTTP.
-* Graphviz solo se usa para visualización, no es una dependencia de compilación.
+* El contenedor ejecuta automáticamente Graphviz (`dot`) al finalizar.
+* Se utilizan threads y semáforo (C++20) para optimizar llamadas HTTP.
+* Puedes editar el actor base en `main.cpp` (por defecto: Keanu Reeves, ID 6384).
 
 ---
 
