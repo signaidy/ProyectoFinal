@@ -1,4 +1,3 @@
-// TMDBAPIUtils.cpp
 #include "TMDBAPIUtils.h"
 
 #include <cpr/cpr.h>
@@ -30,13 +29,24 @@ std::vector<MovieData> TMDBAPIUtils::getMoviesForActor(int personId, int startYe
 
     json j = json::parse(r.text);
     for (const auto& item : j["cast"]) {
-        if (!item.contains("release_date") || item["release_date"].get<std::string>().empty()) continue;
+        if (!item.contains("release_date") || !item["release_date"].is_string()) continue;
+
         std::string release_date = item["release_date"];
-        int year = std::stoi(release_date.substr(0, 4));
+        if (release_date.length() < 4) continue;
+
+        int year = 0;
+        try {
+            year = std::stoi(release_date.substr(0, 4));
+        } catch (const std::exception& e) {
+            std::cerr << "Error parsing year from release_date: '" << release_date << "' - " << e.what() << std::endl;
+            continue;
+        }
+
         if (year >= startYear && year <= endYear) {
             movies.push_back(MovieData{
-                item["id"],
-                item["title"],
+                item["id"].get<int>(),
+                year,
+                item["title"].get<std::string>(),
                 release_date
             });
         }

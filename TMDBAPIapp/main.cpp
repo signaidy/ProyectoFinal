@@ -3,13 +3,14 @@
 #include <string>
 #include <thread>
 #include <mutex>
+#include <cstdlib>
 #include <semaphore>       // C++20: std::counting_semaphore
 #include "TMDBAPIUtils.h"  // (Interfaz para la API de TMDB)
 #include "Graph.h"         // (Interfaz para la representación del grafo)
 
 int main() {
     // 1. Inicialización: especificar actor principal y rango de años
-    int mainActorId = 6384;                  // ID de Keanu Reeves en TMDB:contentReference[oaicite:5]{index=5}
+    int mainActorId = 6384;                  // ID de Keanu Reeves en TMDB
     std::string mainActorName = "Keanu Reeves";
     int startYear = 1985, endYear = 2023;    // Rango de años a considerar
 
@@ -94,7 +95,13 @@ int main() {
     std::string outputFile = "colaboraciones.dot";
     if (graph.exportToDot(outputFile)) {
         std::cout << "Grafo exportado a " << outputFile 
-                  << ". Usa Graphviz (dot) para generar la visualización.\n";
+              << ". Generando imagen SVG con Graphviz...\n";
+        int result = std::system("dot -Tsvg colaboraciones.dot -o grafo.svg");
+        if (result == 0) {
+            std::cout << "Imagen generada exitosamente: grafo.svg\n";
+        } else {
+            std::cerr << "Error al ejecutar Graphviz (dot). Código: " << result << "\n";
+        }
     } else {
         std::cerr << "Error: no se pudo exportar el grafo a DOT.\n";
     }

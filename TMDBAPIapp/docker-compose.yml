@@ -3,5 +3,5 @@ services:
     build: .
     container_name: tmdb-grafo-cpp
     volumes:
-      - .:/app
-    command: ["./grafo-cpp"]
+      - ./output:/output
+    command: ["/usr/local/bin/grafo-cpp"]

@@ -1,6 +1,7 @@
 #include "Graph.h"
 #include <iostream>
 #include <algorithm>
+#include <fstream>
 
 void Graph::addActor(int id, const std::string& name) {
     actors.emplace(id, name);
@@ -45,7 +46,13 @@ bool Graph::exportToDot(const std::string& filename) const {
     for (const auto& [pair, info] : edgeLabels) {
         int a = pair.first;
         int b = pair.second;
-        out << "  \"" << a << "\" -- \"" << b << "\" [label=\"" << info.movieTitle << "\"]" << ";\n";
+        std::string safeTitle = info.movieTitle;
+        size_t pos = 0;
+        while ((pos = safeTitle.find("\"", pos)) != std::string::npos) {
+            safeTitle.replace(pos, 1, "\\\"");
+            pos += 2; // avanzar después del carácter escapado
+        }
+        out << "  \"" << a << "\" -- \"" << b << "\" [label=\"" << safeTitle << "\"];\n";
     }
 
     out << "}\n";
