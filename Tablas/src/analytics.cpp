@@ -1,0 +1,143 @@
+#include "analytics.h"
+#include <stdexcept>
+#include <iostream>
+
+
+static void exec_scalar_double(sqlite3* db, const std::string& sql, double& out){
+    sqlite3_stmt* st=nullptr;
+    if(sqlite3_prepare_v2(db, sql.c_str(), -1, &st, nullptr)!=SQLITE_OK)
+        throw std::runtime_error(sqlite3_errmsg(db));
+    int rc = sqlite3_step(st);
+    if(rc==SQLITE_ROW){ out = sqlite3_column_double(st, 0); }
+    sqlite3_finalize(st);
+}
+
+
+static void exec_rs_kv(sqlite3* db, const std::string& sql, ResultSetKV& rs){
+    sqlite3_stmt* st=nullptr;
+    if(sqlite3_prepare_v2(db, sql.c_str(), -1, &st, nullptr)!=SQLITE_OK)
+        throw std::runtime_error(sqlite3_errmsg(db));
+    while(sqlite3_step(st)==SQLITE_ROW){
+        const unsigned char* s = sqlite3_column_text(st, 0);
+        double v = sqlite3_column_double(st, 1);
+        rs.rows.emplace_back(std::string((const char*)s), v);
+    }
+    sqlite3_finalize(st);
+}
+
+
+static void exec_ts(sqlite3* db, const std::string& sql, TimeSeries& ts){
+    sqlite3_stmt* st=nullptr;
+    if(sqlite3_prepare_v2(db, sql.c_str(), -1, &st, nullptr)!=SQLITE_OK)
+        throw std::runtime_error(sqlite3_errmsg(db));
+    while(sqlite3_step(st)==SQLITE_ROW){
+        int year = sqlite3_column_int(st, 0);
+        double total = sqlite3_column_double(st, 1);
+        ts.points.emplace_back(year, total);
+    }
+    sqlite3_finalize(st);
+}
+
+
+Analytics::Analytics(const std::string& db_path){
+    if(sqlite3_open(db_path.c_str(), &db_)!=SQLITE_OK)
+        throw std::runtime_error("open db: "+std::string(sqlite3_errmsg(db_)));
+}
+
+
+Analytics::~Analytics(){ if(db_) sqlite3_close(db_); }
+
+
+// (a) % de incidentes entre 2018-01-01 y 2020-12-31
+// Asumimos formato ISO YYYY-MM-DD en incidents.date
+// pct = count(range)/count(total)*100
+
+
+double Analytics::pct_incidents_2018_2020(){
+    double total=0, inwin=0;
+    exec_scalar_double(db_, "SELECT COUNT(*) FROM incidents", total);
+    exec_scalar_double(db_, "SELECT COUNT(*) FROM incidents WHERE date >= '2018-01-01' AND date <= '2020-12-31'", inwin);
+    if(total<=0) return 0.0;
+    return (inwin/total)*100.0;
+}
+
+
+// (b) Top 3 transport_mode con detection='intelligence'
+ResultSetKV Analytics::top3_transport_by_intelligence(){
+    ResultSetKV rs;
+    std::string sql = R"SQL(
+        SELECT transport_mode, COUNT(*) AS c
+        FROM details
+        WHERE LOWER(detection) = 'intelligence'
+        GROUP BY transport_mode
+        ORDER BY c DESC
+        LIMIT 3
+    )SQL";
+    exec_rs_kv(db_, sql, rs);
+    return rs;
+}
+
+
+// (c) Métodos de detección con mayor promedio de gente arrestada
+// Join details->outcomes por report_id, agrupar por detection
+ResultSetKV Analytics::detection_by_avg_arrests(size_t topN){
+    ResultSetKV rs;
+    std::string sql = R"SQL(
+        SELECT d.detection, AVG(COALESCE(o.num_ppl_arrested,0)) AS avg_arrest
+        FROM details d
+        LEFT JOIN outcomes o ON o.report_id = d.report_id
+        GROUP BY d.detection
+        HAVING COUNT(*) > 0
+        ORDER BY avg_arrest DESC
+        LIMIT ")SQL" + std::to_string(topN) + ";";
+    exec_rs_kv(db_, sql, rs);
+    return rs;
+}
+
+// (d) Categorías con sentencias más largas (convertir a días)
+// Join incidents->outcomes por report_id; convertir unidades a días
+ResultSetKV Analytics::categories_with_longest_sentences_days(size_t topN){
+    ResultSetKV rs;
+    // Normalización: Years=365, Months=30, Weeks=7, Days=1 (si unit NULL => 0)
+    std::string sql = R"SQL(
+        WITH norm AS (
+        SELECT i.category AS category,
+        CASE
+        WHEN LOWER(COALESCE(o.prison_time_unit,'')) = 'years' THEN COALESCE(o.prison_time,0)*365.0
+        WHEN LOWER(COALESCE(o.prison_time_unit,'')) = 'year' THEN COALESCE(o.prison_time,0)*365.0
+        WHEN LOWER(COALESCE(o.prison_time_unit,'')) = 'months' THEN COALESCE(o.prison_time,0)*30.0
+        WHEN LOWER(COALESCE(o.prison_time_unit,'')) = 'month' THEN COALESCE(o.prison_time,0)*30.0
+        WHEN LOWER(COALESCE(o.prison_time_unit,'')) = 'weeks' THEN COALESCE(o.prison_time,0)*7.0
+        WHEN LOWER(COALESCE(o.prison_time_unit,'')) = 'week' THEN COALESCE(o.prison_time,0)*7.0
+        WHEN LOWER(COALESCE(o.prison_time_unit,'')) = 'days' THEN COALESCE(o.prison_time,0)
+        WHEN LOWER(COALESCE(o.prison_time_unit,'')) = 'day' THEN COALESCE(o.prison_time,0)
+        ELSE 0.0
+        END AS days
+        FROM incidents i
+        LEFT JOIN outcomes o ON o.report_id = i.report_id
+        )
+        SELECT category, AVG(days) AS avg_days
+        FROM norm
+        GROUP BY category
+        ORDER BY avg_days DESC
+        LIMIT ")SQL" + std::to_string(topN) + ";";
+    exec_rs_kv(db_, sql, rs);
+    return rs;
+}
+
+// (e) Serie de tiempo anual de total de multas (fine) por año
+// Tomamos año desde incidents.date
+TimeSeries Analytics::fine_totals_per_year(){
+    TimeSeries ts;
+    std::string sql = R"SQL(
+        SELECT CAST(substr(i.date,1,4) AS INT) AS yr,
+        SUM(COALESCE(o.fine,0)) AS total_fine
+        FROM incidents i
+        LEFT JOIN outcomes o ON o.report_id = i.report_id
+        WHERE i.date GLOB '????-??-??'
+        GROUP BY yr
+        ORDER BY yr ASC
+    )SQL";
+    exec_ts(db_, sql, ts);
+    return ts;
+}

@@ -1,0 +1,33 @@
+#pragma once
+#include <string>
+#include <sqlite3.h>
+#include <vector>
+#include <utility>
+
+
+struct ResultSetKV { // para barras: label, value
+    std::vector<std::pair<std::string,double>> rows;
+};
+
+
+struct TimeSeries { // para series anuales
+    std::vector<std::pair<int,double>> points; // year, total
+};
+
+
+class Analytics {
+public:
+    explicit Analytics(const std::string& db_path);
+    ~Analytics();
+
+
+    double pct_incidents_2018_2020();
+    ResultSetKV top3_transport_by_intelligence();
+    ResultSetKV detection_by_avg_arrests(size_t topN=10);
+    ResultSetKV categories_with_longest_sentences_days(size_t topN=10);
+    TimeSeries fine_totals_per_year();
+
+
+private:
+    sqlite3* db_ {nullptr};
+};
