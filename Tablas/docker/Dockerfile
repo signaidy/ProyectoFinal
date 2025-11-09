@@ -6,9 +6,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Herramientas de compilación + SQLite + Python (para matplotlib)
 RUN apt-get update && apt-get install -y \
-build-essential cmake git curl \
-libsqlite3-dev sqlite3 \
-python3 python3-dev python3-pip python3-numpy python3-matplotlib \
+build-essential cmake curl git \
+libsqlite3-dev \
+python3 python3-dev python3-matplotlib python3-numpy python3-pip sqlite3 \
 && rm -rf /var/lib/apt/lists/*
 
 # App

@@ -83,14 +83,20 @@ static void bulk_insert_from_csv(sqlite3* db, const fs::path& file, const string
     if(!getline(in, line)) return;
 
 
+    string placeholders;
+    for (size_t i=0;i<cols.size();++i) {
+        placeholders += "?";
+        if (i+1<cols.size()) placeholders += ",";
+    }
+
     string q = "INSERT INTO "+table+" (";
     for(size_t i=0;i<cols.size();++i){ q += cols[i]; if(i+1<cols.size()) q += ","; }
-    q += ") VALUES (" + string(cols.size()-1, '?,') + "?);"; // n placeholders
+    q += ") VALUES (" + placeholders + ");";
 
 
     sqlite3_stmt* stmt=nullptr;
     if(sqlite3_prepare_v2(db, q.c_str(), -1, &stmt, nullptr) != SQLITE_OK)
-    throw runtime_error("Prepare failed: "+string(sqlite3_errmsg(db)));
+        throw runtime_error(string("Prepare failed: ") + sqlite3_errmsg(db) + "\nSQL: " + q);
 
 
     exec_sql(db, "BEGIN TRANSACTION");
@@ -125,23 +131,64 @@ static void bulk_insert_from_csv(sqlite3* db, const fs::path& file, const string
 }
 
 
-void DbLoader::load_incidents(){
-    bulk_insert_from_csv(db_, fs::path(cfg_.data_dir)/"incidents.csv", "incidents",
-    {"report_id","category","date"});
-}
+// Reemplaza el contenido de cada uno de estos métodos por lo siguiente:
 
+void DbLoader::load_incidents(){
+    sqlite3* dbc = nullptr;
+    if (sqlite3_open(cfg_.db_path.c_str(), &dbc) != SQLITE_OK) {
+        throw std::runtime_error(std::string("Cannot open DB (incidents): ") + sqlite3_errmsg(dbc));
+    }
+    sqlite3_busy_timeout(dbc, 30000);
+    exec_sql(dbc, "PRAGMA journal_mode=WAL;");
+    exec_sql(dbc, "PRAGMA synchronous=NORMAL;");
+
+    bulk_insert_from_csv(
+        dbc,
+        std::filesystem::path(cfg_.data_dir) / "incidents.csv",
+        "incidents",
+        {"report_id","category","date"}
+    );
+
+    sqlite3_close(dbc);
+}
 
 void DbLoader::load_details(){
-    bulk_insert_from_csv(db_, fs::path(cfg_.data_dir)/"details.csv", "details",
-    {"report_id","subject","transport_mode","detection"});
-}
+    sqlite3* dbc = nullptr;
+    if (sqlite3_open(cfg_.db_path.c_str(), &dbc) != SQLITE_OK) {
+        throw std::runtime_error(std::string("Cannot open DB (details): ") + sqlite3_errmsg(dbc));
+    }
+    sqlite3_busy_timeout(dbc, 30000);
+    exec_sql(dbc, "PRAGMA journal_mode=WAL;");
+    exec_sql(dbc, "PRAGMA synchronous=NORMAL;");
 
+    bulk_insert_from_csv(
+        dbc,
+        std::filesystem::path(cfg_.data_dir) / "details.csv",
+        "details",
+        {"report_id","subject","transport_mode","detection"}
+    );
+
+    sqlite3_close(dbc);
+}
 
 void DbLoader::load_outcomes(){
-    bulk_insert_from_csv(db_, fs::path(cfg_.data_dir)/"outcomes.csv", "outcomes",
-    {"report_id","outcome","num_ppl_fined","fine","num_ppl_arrested","prison_time","prison_time_unit"});
-}
+    sqlite3* dbc = nullptr;
+    if (sqlite3_open(cfg_.db_path.c_str(), &dbc) != SQLITE_OK) {
+        throw std::runtime_error(std::string("Cannot open DB (outcomes): ") + sqlite3_errmsg(dbc));
+    }
+    sqlite3_busy_timeout(dbc, 30000);
+    exec_sql(dbc, "PRAGMA journal_mode=WAL;");
+    exec_sql(dbc, "PRAGMA synchronous=NORMAL;");
 
+    bulk_insert_from_csv(
+        dbc,
+        std::filesystem::path(cfg_.data_dir) / "outcomes.csv",
+        "outcomes",
+        {"report_id","outcome","num_ppl_fined","fine","num_ppl_arrested","prison_time","prison_time_unit"}
+    );
+
+    sqlite3_close(dbc);
+}   
 
 void DbLoader::load_all_csv_parallel(){
     // Límite de concurrencia (ej. 2 en paralelo)
