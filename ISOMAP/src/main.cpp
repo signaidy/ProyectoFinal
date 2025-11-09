@@ -17,20 +17,27 @@ struct Point {
     vector<double> coords;
 };
 
-// Load data from file
-vector<Point> loadData(const string& path) {
+// Load binary data
+vector<Point> loadBinaryData(const string& path, int dims = 3, int maxPoints = 2000) {
     vector<Point> points;
-    ifstream file(path);
-    string line;
-    while (getline(file, line)) {
-        istringstream iss(line);
+    ifstream file(path, ios::binary);
+    if (!file) {
+        cerr << "Error al abrir el archivo binario: " << path << endl;
+        return points;
+    }
+
+    while (file && points.size() < maxPoints) {
         Point p;
-        double val;
-        while (iss >> val) {
+        for (int i = 0; i < dims; ++i) {
+            double val;
+            file.read(reinterpret_cast<char*>(&val), sizeof(double));
+            if (!file) break;
             p.coords.push_back(val);
         }
-        if (!p.coords.empty()) points.push_back(p);
+        if (p.coords.size() == dims)
+            points.push_back(p);
     }
+
     return points;
 }
 
@@ -109,7 +116,16 @@ MatrixXd classicMDS(const MatrixXd& D, int d = 2) {
 }
 
 int main() {
-    auto points = loadData("data/isomap.dat");
+    auto points = loadBinaryData("/data/isomap.dat", 3, 2000);
+
+    // Debug: print first 5 points
+    cout << "Puntos cargados: " << points.size() << endl;
+    for (int i = 0; i < min(5, (int)points.size()); ++i) {
+        for (double val : points[i].coords)
+            cout << val << " ";
+        cout << endl;
+    }
+
     auto distGraph = computeDistanceMatrix(points, 7); // k=7
     auto geoDists = floydWarshall(distGraph);
     auto reduced = classicMDS(geoDists, 2);

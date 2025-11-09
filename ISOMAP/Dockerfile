@@ -27,4 +27,4 @@ RUN mkdir -p /output && cp isomap /output/
 WORKDIR /output
 
 # Ejecutar y dejar los resultados ahí
-CMD ../build/isomap ../data/isomap.dat
+CMD ["/output/isomap", "/data/isomap.dat"]

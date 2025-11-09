@@ -4,5 +4,6 @@ services:
     container_name: isomap-runner
     volumes:
       - ./data:/data
-      - ./output:/output
-    working_dir: /output
+      - ./output:/results
+    working_dir: /results
+    command: ["/output/isomap", "/data/isomap.dat"]
