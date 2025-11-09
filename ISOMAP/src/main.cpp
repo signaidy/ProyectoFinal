@@ -18,7 +18,7 @@ struct Point {
 };
 
 // Load binary data
-vector<Point> loadBinaryData(const string& path, int dims = 3, int maxPoints = 2000) {
+vector<Point> loadBinaryData(const string& path, int dims = 3, int maxPoints = 2000, size_t skipBytes = 0) {
     vector<Point> points;
     ifstream file(path, ios::binary);
     if (!file) {
@@ -26,11 +26,13 @@ vector<Point> loadBinaryData(const string& path, int dims = 3, int maxPoints = 2
         return points;
     }
 
+    file.seekg(skipBytes, ios::beg);
+
     while (file && points.size() < maxPoints) {
         Point p;
         for (int i = 0; i < dims; ++i) {
             double val;
-            file.read(reinterpret_cast<char*>(&val), sizeof(double));
+            file.read(reinterpret_cast<char*>(&val), sizeof(double));  // <-- DOUBLE!
             if (!file) break;
             p.coords.push_back(val);
         }
@@ -39,6 +41,24 @@ vector<Point> loadBinaryData(const string& path, int dims = 3, int maxPoints = 2
     }
 
     return points;
+}
+
+// Debug function to read raw bytes
+void debugReadRawBytes(const string& path) {
+    ifstream file(path, ios::binary);
+    if (!file) {
+        cerr << "Error al abrir archivo binario para debug." << endl;
+        return;
+    }
+
+    cout << "Primeros 60 bytes como enteros:" << endl;
+    for (int i = 0; i < 200; ++i) {
+        uint8_t byte;
+        file.read(reinterpret_cast<char*>(&byte), sizeof(uint8_t));
+        if (!file) break;
+        cout << static_cast<int>(byte) << " ";
+    }
+    cout << endl;
 }
 
 // Compute Euclidean distance between two points
@@ -116,13 +136,15 @@ MatrixXd classicMDS(const MatrixXd& D, int d = 2) {
 }
 
 int main() {
-    auto points = loadBinaryData("/data/isomap.dat", 3, 2000);
+    debugReadRawBytes("/data/isomap.dat");
+
+    auto points = loadBinaryData("/data/isomap.dat", 3, 2000, 1024);
 
     // Debug: print first 5 points
     cout << "Puntos cargados: " << points.size() << endl;
     for (int i = 0; i < min(5, (int)points.size()); ++i) {
         for (double val : points[i].coords)
-            cout << val << " ";
+            cout << fixed << val << " ";
         cout << endl;
     }
 

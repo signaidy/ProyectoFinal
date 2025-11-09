@@ -4,6 +4,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Instalar dependencias
 RUN apt-get update && apt-get install -y \
+    bsdmainutils \
     build-essential \
     cmake \
     git \
@@ -18,10 +19,8 @@ COPY . .
 
 # Compilar el programa
 RUN g++ -std=c++20 -O2 -o isomap src/main.cpp \
-    -I/usr/include/eigen3
-
-# Mover ejecutable a lugar accesible
-RUN mkdir -p /output && cp isomap /output/
+    -I/usr/include/eigen3 \
+    && mkdir -p /output && cp isomap /output/
 
 # Carpeta de ejecución
 WORKDIR /output
