@@ -1,0 +1,8 @@
+services:
+  isomap:
+    build: .
+    container_name: isomap-runner
+    volumes:
+      - ./data:/data
+      - ./output:/output
+    working_dir: /output

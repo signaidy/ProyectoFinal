@@ -12,10 +12,12 @@
 using namespace std;
 using namespace Eigen;
 
+// Data point structure
 struct Point {
     vector<double> coords;
 };
 
+// Load data from file
 vector<Point> loadData(const string& path) {
     vector<Point> points;
     ifstream file(path);
@@ -32,6 +34,7 @@ vector<Point> loadData(const string& path) {
     return points;
 }
 
+// Compute Euclidean distance between two points
 double euclideanDist(const Point& a, const Point& b) {
     double sum = 0;
     for (size_t i = 0; i < a.coords.size(); ++i) {
@@ -41,17 +44,21 @@ double euclideanDist(const Point& a, const Point& b) {
     return sqrt(sum);
 }
 
+// Construct k-NN graph and compute shortest paths
 MatrixXd computeDistanceMatrix(const vector<Point>& points, int k) {
     int n = points.size();
     MatrixXd graph = MatrixXd::Constant(n, n, numeric_limits<double>::infinity());
 
+    // Initialize distances
     for (int i = 0; i < n; ++i) {
         vector<pair<double, int>> dists;
+        // Compute distances to all other points
         for (int j = 0; j < n; ++j) {
             if (i == j) continue;
             dists.emplace_back(euclideanDist(points[i], points[j]), j);
         }
         sort(dists.begin(), dists.end());
+        // Connect to k nearest neighbors
         for (int j = 0; j < k; ++j) {
             int idx = dists[j].second;
             double dist = dists[j].first;
@@ -62,16 +69,22 @@ MatrixXd computeDistanceMatrix(const vector<Point>& points, int k) {
     return graph;
 }
 
+// Floyd-Warshall algorithm for all-pairs shortest paths
 MatrixXd floydWarshall(MatrixXd dist) {
     int n = dist.rows();
+    // Initialize self-distances to zero
     for (int k = 0; k < n; ++k)
+        // Update distances
         for (int i = 0; i < n; ++i)
+            // Check for shorter paths
             for (int j = 0; j < n; ++j)
+                // Update distance if a shorter path is found
                 if (dist(i, k) + dist(k, j) < dist(i, j))
                     dist(i, j) = dist(i, k) + dist(k, j);
     return dist;
 }
 
+// Classical MDS
 MatrixXd classicMDS(const MatrixXd& D, int d = 2) {
     int n = D.rows();
     MatrixXd D2 = D.array().square();
@@ -80,13 +93,18 @@ MatrixXd classicMDS(const MatrixXd& D, int d = 2) {
     double total_mean = D2.mean();
 
     MatrixXd B(n, n);
+
+    // Double centering
     for (int i = 0; i < n; ++i)
+        // Compute B matrix
         for (int j = 0; j < n; ++j)
             B(i, j) = -0.5 * (D2(i, j) - row_mean(i) - col_mean(j) + total_mean);
 
     SelfAdjointEigenSolver<MatrixXd> solver(B);
     MatrixXd eigvecs = solver.eigenvectors().rightCols(d);
     MatrixXd eigvals = solver.eigenvalues().tail(d).asDiagonal();
+
+    // Return the reduced coordinates
     return eigvecs * eigvals.cwiseSqrt();
 }
 
@@ -97,6 +115,8 @@ int main() {
     auto reduced = classicMDS(geoDists, 2);
 
     ofstream out("embedding.csv");
+
+    // Save reduced coordinates
     for (int i = 0; i < reduced.rows(); ++i)
         out << reduced(i, 0) << "," << reduced(i, 1) << "\n";
     cout << "ISOMAP projection saved to embedding.csv" << endl;
