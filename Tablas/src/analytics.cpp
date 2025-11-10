@@ -82,20 +82,13 @@ TimeSeries Analytics::incident_totals_by_year(int from_year, int to_year) {
 ResultSetKV Analytics::top3_transport_by_intelligence(){
     ResultSetKV rs;
     std::string sql = R"SQL(
-        WITH filtered AS (
-            SELECT 
-                CASE 
-                    WHEN TRIM(transport_mode) = '' OR transport_mode IS NULL THEN 'No Vehicle'
-                    ELSE transport_mode
-                END AS label
-            FROM details
-            WHERE detection LIKE '%Intelligence%' COLLATE NOCASE
-        )
-        SELECT label, COUNT(*) AS c
-        FROM filtered
-        GROUP BY label
+        SELECT transport_mode, COUNT(*) AS c
+        FROM details
+        WHERE LOWER(COALESCE(detection, '')) LIKE '%intelligence%' 
+        AND TRIM(COALESCE(transport_mode, '')) != ''
+        GROUP BY transport_mode
         ORDER BY c DESC
-        LIMIT 4
+        LIMIT 3
     )SQL";
     exec_rs_kv(db_, sql, rs);
     return rs;
