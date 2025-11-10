@@ -1,0 +1,47 @@
+
+--- Diagnóstico de la base de datos ---
+Total incidents: 14588
+Total details: 14590
+Total outcomes: 14588
+Primer año: 2015
+Último año: 2024
+
+Multas totales por año:
+  2015: 7.83705e+06
+  2016: 1.27732e+07
+  2017: 1.3834e+07
+  2018: 1.80453e+07
+  2019: 1.66177e+07
+  2020: 867365
+  2021: 6.34348e+06
+  2022: 4.89158e+06
+  2023: 2.69754e+06
+  2024: 0
+
+Distribución de detection (top 5):
+  : 7754
+  Intelligence: 2962
+  Routine Inspection: 1360
+  Operation: 1003
+  X-ray: 506
+
+Distribución de transport_mode (top 5):
+  (null): 8992
+  Land - Vehicle: 2761
+  Air: 1701
+  Sea: 780
+  Land - Foot: 127
+Total personas arrestadas: 12755
+Total multas: 8.39072e+07
+
+Primeras 3 filas de incidents:
+  MOR18304 | 1. Seizure | 2017-04-30
+  MOR32059 | 1. Seizure | 2020-12-01
+  MOR54725 | 1. Seizure | 2017-05-15
+
+Diagnóstico de sentencias (d):
+  years: 616
+  months: 340
+  days: 14
+  weeks: 12
+  n/a: 2

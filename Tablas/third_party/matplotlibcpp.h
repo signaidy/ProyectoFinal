@@ -30,7 +30,13 @@ namespace matplotlibcpp {
         public:
         // Constructor: import matplotlib.pyplot
         Plotter(){
-            PyObject* mpl = detail::import("matplotlib"); Py_DECREF(mpl);
+            PyObject* mpl = detail::import("matplotlib");
+
+            // Forzar backend 'Agg' (sin GUI, apto para Docker/headless)
+            PyObject* use_res = PyObject_CallMethod(mpl, "use", "s", "Agg");
+            Py_XDECREF(use_res);
+            Py_DECREF(mpl);
+
             plt_ = detail::import("matplotlib.pyplot");
         }
         ~Plotter(){ if(plt_) Py_DECREF(plt_); }
@@ -45,8 +51,8 @@ namespace matplotlibcpp {
             }
         }
         
+        // Bar plot with labels and values
         void bar(const std::vector<std::string>& labels, const std::vector<double>& vals){
-            // Simple bar via Python: positions = range(n); plt.bar(positions, vals); plt.xticks(positions, labels, rotation=45, ha='right')
             PyObject* py_labels = PyList_New(labels.size());
             PyObject* py_vals = PyList_New(vals.size());
             for(size_t i=0;i<labels.size();++i){
@@ -55,13 +61,22 @@ namespace matplotlibcpp {
             for(size_t i=0;i<vals.size();++i){
                 PyList_SetItem(py_vals, i, PyFloat_FromDouble(vals[i]));
             }
-            PyObject* kwargs = PyDict_New();
-            PyDict_SetItemString(kwargs, "rotation", PyLong_FromLong(45));
+
+            // plt.bar(labels, vals)
             PyObject* res = PyObject_CallMethod(plt_, "bar", "OO", py_labels, py_vals);
             Py_XDECREF(res);
-            res = PyObject_CallMethod(plt_, "xticks", "OO", py_labels, py_labels);
+
+            // xticks con rotación
+            PyObject* args = PyTuple_Pack(1, py_labels);
+            PyObject* kwargs = PyDict_New();
+            PyDict_SetItemString(kwargs, "rotation", PyLong_FromLong(45));
+            res = PyObject_Call( PyObject_GetAttrString(plt_, "xticks"), args, kwargs );
             Py_XDECREF(res);
-            Py_DECREF(py_labels); Py_DECREF(py_vals); Py_DECREF(kwargs);
+
+            Py_DECREF(args);
+            Py_DECREF(kwargs);
+            Py_DECREF(py_labels);
+            Py_DECREF(py_vals);
         }
         // Simple xy plot
         void plot(const std::vector<double>& x, const std::vector<double>& y){

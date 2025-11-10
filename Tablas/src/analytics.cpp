@@ -19,8 +19,9 @@ static void exec_rs_kv(sqlite3* db, const std::string& sql, ResultSetKV& rs){
         throw std::runtime_error(sqlite3_errmsg(db));
     while(sqlite3_step(st)==SQLITE_ROW){
         const unsigned char* s = sqlite3_column_text(st, 0);
+        std::string key = s ? reinterpret_cast<const char*>(s) : "(null)";
         double v = sqlite3_column_double(st, 1);
-        rs.rows.emplace_back(std::string((const char*)s), v);
+        rs.rows.emplace_back(key, v);
     }
     sqlite3_finalize(st);
 }
@@ -47,47 +48,87 @@ Analytics::Analytics(const std::string& db_path){
 // Destructor: cierra la base de datos SQLite
 Analytics::~Analytics(){ if(db_) sqlite3_close(db_); }
 
+// Total de incidentes en la tabla incidents
+double Analytics::total_incident_count() {
+    double total = 0;
+    exec_scalar_double(db_, "SELECT COUNT(*) FROM incidents", total);
+    return total;
+}
 
 // (a) % de incidentes entre 2018-01-01 y 2020-12-31
 // Asumimos formato ISO YYYY-MM-DD en incidents.date
 // pct = count(range)/count(total)*100
-
-
-double Analytics::pct_incidents_2018_2020(){
-    double total=0, inwin=0;
-    exec_scalar_double(db_, "SELECT COUNT(*) FROM incidents", total);
-    exec_scalar_double(db_, "SELECT COUNT(*) FROM incidents WHERE date >= '2018-01-01' AND date <= '2020-12-31'", inwin);
-    if(total<=0) return 0.0;
-    return (inwin/total)*100.0;
+TimeSeries Analytics::incident_totals_by_year(int from_year, int to_year) {
+    TimeSeries ts;
+    std::string sql = R"SQL(
+        WITH cleaned AS (
+            SELECT 
+                CAST(SUBSTR(TRIM(REPLACE(REPLACE(date, CHAR(13), ''), CHAR(10), '')), 1, 4) AS INT) AS yr
+            FROM incidents
+            WHERE TRIM(REPLACE(REPLACE(date, CHAR(13), ''), CHAR(10), '')) 
+                  GLOB '[1-2][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'
+        )
+        SELECT yr, COUNT(*) AS total
+        FROM cleaned
+        WHERE yr BETWEEN )SQL" + std::to_string(from_year) + " AND " + std::to_string(to_year) + R"SQL(
+        GROUP BY yr
+        ORDER BY yr
+    )SQL";
+    exec_ts(db_, sql, ts);
+    return ts;
 }
-
 
 // (b) Top 3 transport_mode con detection='intelligence'
 ResultSetKV Analytics::top3_transport_by_intelligence(){
     ResultSetKV rs;
     std::string sql = R"SQL(
-        SELECT transport_mode, COUNT(*) AS c
-        FROM details
-        WHERE LOWER(detection) = 'intelligence'
-        GROUP BY transport_mode
+        WITH filtered AS (
+            SELECT 
+                CASE 
+                    WHEN TRIM(transport_mode) = '' OR transport_mode IS NULL THEN 'No Vehicle'
+                    ELSE transport_mode
+                END AS label
+            FROM details
+            WHERE detection LIKE '%Intelligence%' COLLATE NOCASE
+        )
+        SELECT label, COUNT(*) AS c
+        FROM filtered
+        GROUP BY label
         ORDER BY c DESC
-        LIMIT 3
+        LIMIT 4
     )SQL";
     exec_rs_kv(db_, sql, rs);
     return rs;
 }
 
-
 // (c) Métodos de detección con mayor promedio de gente arrestada
-// Join details->outcomes por report_id, agrupar por detection
+// Join details->outcomes por report_id, pero primero filtrar detections frecuentes
 ResultSetKV Analytics::detection_by_avg_arrests(size_t topN){
     ResultSetKV rs;
     std::string sql = R"SQL(
-        SELECT d.detection, AVG(COALESCE(o.num_ppl_arrested,0)) AS avg_arrest
-        FROM details d
-        LEFT JOIN outcomes o ON o.report_id = d.report_id
-        GROUP BY d.detection
-        HAVING COUNT(*) > 0
+        WITH detection_counts AS (
+            SELECT 
+                LOWER(TRIM(REPLACE(REPLACE(detection, CHAR(13), ''), CHAR(10), ''))) AS detection
+            FROM details
+            WHERE TRIM(REPLACE(REPLACE(detection, CHAR(13), ''), CHAR(10), '')) != ''
+            AND detection IS NOT NULL
+            GROUP BY detection
+            HAVING COUNT(*) >= 10
+        ),
+        joined AS (
+            SELECT 
+                LOWER(TRIM(REPLACE(REPLACE(d.detection, CHAR(13), ''), CHAR(10), ''))) AS label,
+                COALESCE(o.num_ppl_arrested, 0) AS arrested
+            FROM details d
+            INNER JOIN outcomes o ON o.report_id = d.report_id
+            INNER JOIN detection_counts dc 
+            ON dc.detection = LOWER(TRIM(REPLACE(REPLACE(d.detection, CHAR(13), ''), CHAR(10), '')))
+            WHERE TRIM(REPLACE(REPLACE(d.detection, CHAR(13), ''), CHAR(10), '')) != ''
+        )
+        SELECT label, AVG(arrested) AS avg_arrest
+        FROM joined
+        GROUP BY label
+        HAVING label != ''
         ORDER BY avg_arrest DESC
         LIMIT )SQL" + std::to_string(topN) + ";";
     exec_rs_kv(db_, sql, rs);
@@ -98,27 +139,26 @@ ResultSetKV Analytics::detection_by_avg_arrests(size_t topN){
 // Join incidents->outcomes por report_id; convertir unidades a días
 ResultSetKV Analytics::categories_with_longest_sentences_days(size_t topN){
     ResultSetKV rs;
-    // Normalización: Years=365, Months=30, Weeks=7, Days=1 (si unit NULL => 0)
     std::string sql = R"SQL(
-        WITH norm AS (
-        SELECT i.category AS category,
-        CASE
-        WHEN LOWER(COALESCE(o.prison_time_unit,'')) = 'years' THEN COALESCE(o.prison_time,0)*365.0
-        WHEN LOWER(COALESCE(o.prison_time_unit,'')) = 'year' THEN COALESCE(o.prison_time,0)*365.0
-        WHEN LOWER(COALESCE(o.prison_time_unit,'')) = 'months' THEN COALESCE(o.prison_time,0)*30.0
-        WHEN LOWER(COALESCE(o.prison_time_unit,'')) = 'month' THEN COALESCE(o.prison_time,0)*30.0
-        WHEN LOWER(COALESCE(o.prison_time_unit,'')) = 'weeks' THEN COALESCE(o.prison_time,0)*7.0
-        WHEN LOWER(COALESCE(o.prison_time_unit,'')) = 'week' THEN COALESCE(o.prison_time,0)*7.0
-        WHEN LOWER(COALESCE(o.prison_time_unit,'')) = 'days' THEN COALESCE(o.prison_time,0)
-        WHEN LOWER(COALESCE(o.prison_time_unit,'')) = 'day' THEN COALESCE(o.prison_time,0)
-        ELSE 0.0
-        END AS days
-        FROM incidents i
-        LEFT JOIN outcomes o ON o.report_id = i.report_id
+        WITH norm_outcomes AS (
+            SELECT report_id,
+                CASE
+                    WHEN LOWER(TRIM(COALESCE(prison_time_unit, ''))) IN ('year', 'years') THEN COALESCE(prison_time, 0)*365.0
+                    WHEN LOWER(TRIM(COALESCE(prison_time_unit, ''))) IN ('month', 'months') THEN COALESCE(prison_time, 0)*30.0
+                    WHEN LOWER(TRIM(COALESCE(prison_time_unit, ''))) IN ('week', 'weeks') THEN COALESCE(prison_time, 0)*7.0
+                    WHEN LOWER(TRIM(COALESCE(prison_time_unit, ''))) IN ('day', 'days') THEN COALESCE(prison_time, 0)
+                    ELSE 0.0
+                END AS days
+            FROM outcomes
+            WHERE prison_time IS NOT NULL AND prison_time > 0
         )
-        SELECT category, AVG(days) AS avg_days
-        FROM norm
-        GROUP BY category
+        SELECT i.category, AVG(o.days) AS avg_days
+        FROM incidents i
+        JOIN norm_outcomes o 
+          ON TRIM(REPLACE(REPLACE(o.report_id, CHAR(13), ''), CHAR(10), '')) = 
+             TRIM(REPLACE(REPLACE(i.report_id, CHAR(13), ''), CHAR(10), ''))
+        WHERE i.category IS NOT NULL AND o.days > 0
+        GROUP BY i.category
         ORDER BY avg_days DESC
         LIMIT )SQL" + std::to_string(topN) + ";";
     exec_rs_kv(db_, sql, rs);
@@ -126,17 +166,22 @@ ResultSetKV Analytics::categories_with_longest_sentences_days(size_t topN){
 }
 
 // (e) Serie de tiempo anual de total de multas (fine) por año
-// Tomamos año desde incidents.date
-TimeSeries Analytics::fine_totals_per_year(){
+TimeSeries Analytics::fine_totals_per_year() {
     TimeSeries ts;
     std::string sql = R"SQL(
-        SELECT CAST(substr(i.date,1,4) AS INT) AS yr,
-        SUM(COALESCE(o.fine,0)) AS total_fine
-        FROM incidents i
-        LEFT JOIN outcomes o ON o.report_id = i.report_id
-        WHERE i.date LIKE '____-__-__'
-        GROUP BY yr
-        ORDER BY yr ASC
+        WITH cleaned AS (
+            SELECT 
+                i.report_id,
+                CAST(SUBSTR(REPLACE(REPLACE(REPLACE(i.date, CHAR(13), ''), CHAR(10), ''), ' ', ''), 1, 4) AS INT) AS yr
+            FROM incidents i
+            WHERE REPLACE(REPLACE(REPLACE(i.date, CHAR(13), ''), CHAR(10), ''), ' ', '') 
+                GLOB '[1-2][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'
+        )
+        SELECT c.yr, SUM(COALESCE(o.fine, 0)) AS total_fine
+        FROM cleaned c
+        JOIN outcomes o ON o.report_id = c.report_id
+        GROUP BY c.yr
+        ORDER BY c.yr ASC
     )SQL";
     exec_ts(db_, sql, ts);
     return ts;
@@ -159,8 +204,23 @@ void Analytics::run_diagnostics(std::ostream& out) {
     run_scalar("Total details", "SELECT COUNT(*) FROM details");
     run_scalar("Total outcomes", "SELECT COUNT(*) FROM outcomes");
 
-    run_scalar("Primer año", R"SQL(SELECT MIN(substr(date,1,4)) FROM incidents WHERE date LIKE '____-__-__')SQL");
-    run_scalar("Último año", R"SQL(SELECT MAX(substr(date,1,4)) FROM incidents WHERE date LIKE '____-__-__')SQL");
+    run_scalar("Primer año", R"SQL(
+        SELECT MIN(CAST(substr(REPLACE(REPLACE(REPLACE(date, CHAR(13), ''), CHAR(10), ''), ' ', ''),1,4) AS INT)) 
+        FROM incidents 
+        WHERE REPLACE(REPLACE(REPLACE(date, CHAR(13), ''), CHAR(10), ''), ' ', '') GLOB '[1-2][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'
+    )SQL");
+
+    run_scalar("Último año", R"SQL(
+        SELECT MAX(CAST(substr(REPLACE(REPLACE(REPLACE(date, CHAR(13), ''), CHAR(10), ''), ' ', ''),1,4) AS INT)) 
+        FROM incidents 
+        WHERE REPLACE(REPLACE(REPLACE(date, CHAR(13), ''), CHAR(10), ''), ' ', '') GLOB '[1-2][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'
+    )SQL");
+
+    out << "\nMultas totales por año:\n";
+    auto fines = fine_totals_per_year();
+    for (const auto& [year, total] : fines.points) {
+        out << "  " << year << ": " << total << "\n";
+    }
 
     out << "\nDistribución de detection (top 5):\n";
     ResultSetKV det;
@@ -197,5 +257,18 @@ void Analytics::run_diagnostics(std::ostream& out) {
                 << sqlite3_column_text(stmt,2) << "\n";
         }
         sqlite3_finalize(stmt);
+    }
+
+    out << "\nDiagnóstico de sentencias (d):\n";    
+    ResultSetKV rs;
+    exec_rs_kv(db_, R"SQL(
+        SELECT LOWER(TRIM(prison_time_unit)) AS unit, COUNT(*) 
+        FROM outcomes 
+        WHERE prison_time IS NOT NULL AND prison_time > 0
+        GROUP BY unit
+        ORDER BY COUNT(*) DESC
+    )SQL", rs);
+    for (const auto& [unit, count] : rs.rows) {
+        out << "  " << unit << ": " << count << "\n";
     }
 }

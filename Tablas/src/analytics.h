@@ -17,14 +17,14 @@ struct TimeSeries { // para series anuales
 
 class Analytics {
 public:
-    explicit Analytics(const std::string& db_path);
+    Analytics(const std::string& db_path);
     ~Analytics();
 
-
-    double pct_incidents_2018_2020();
+    double total_incident_count();
+    TimeSeries incident_totals_by_year(int from_year, int to_year);
     ResultSetKV top3_transport_by_intelligence();
-    ResultSetKV detection_by_avg_arrests(size_t topN=10);
-    ResultSetKV categories_with_longest_sentences_days(size_t topN=10);
+    ResultSetKV detection_by_avg_arrests(size_t topN);
+    ResultSetKV categories_with_longest_sentences_days(size_t topN);
     TimeSeries fine_totals_per_year();
     void run_diagnostics(std::ostream& out);
 

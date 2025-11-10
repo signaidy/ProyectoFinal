@@ -27,3 +27,5 @@ mkdir -p /app/outputs
 
 # Comando por defecto: ejecuta el binario (carga CSV, crea índices y genera PNG)
 CMD ["/app/build/incidents_analytics"]
+
+USER root

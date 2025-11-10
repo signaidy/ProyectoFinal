@@ -7,4 +7,4 @@ services:
     container_name: incidents-analytics
     volumes:
       - ./data:/app/data:ro
-      - ./outputs:/app/outputs
+      - ./outputs:/app/outputs/images
