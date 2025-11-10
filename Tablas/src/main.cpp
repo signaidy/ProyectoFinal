@@ -1,5 +1,6 @@
 #include <iostream>
 #include <filesystem>
+#include <fstream>
 #include "db_loader.h"
 #include "analytics.h"
 #include "chart.h"
@@ -7,17 +8,28 @@
 using namespace std;
 namespace fs = std::filesystem;
 
+int main(int argc, char* argv[]) {
+    try {
+        bool modo_diagnostico = false;
+        if (argc > 1 && std::string(argv[1]) == "--diagnostico") {
+            modo_diagnostico = true;
+        }
 
-int main(){
-    try{
         DbConfig cfg; // usa /app/data y /app/outputs dentro del contenedor
         DbLoader loader(cfg);
         loader.init_schema();
         loader.load_all_csv_parallel();
 
-
         Analytics an(cfg.db_path);
 
+        if (modo_diagnostico) {
+            std::filesystem::create_directories("/app/outputs");
+            std::ofstream diag_out("/app/outputs/diagnostico.txt");
+            an.run_diagnostics(std::cout);
+            an.run_diagnostics(diag_out);
+            std::cout << "\nDiagnóstico exportado a /app/outputs/diagnostico.txt\n";
+            return 0;
+        }
 
         // (a)
         double pct = an.pct_incidents_2018_2020();

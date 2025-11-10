@@ -89,7 +89,7 @@ static void bulk_insert_from_csv(sqlite3* db, const fs::path& file, const string
         if (i+1<cols.size()) placeholders += ",";
     }
 
-    string q = "INSERT INTO "+table+" (";
+    string q = "INSERT OR IGNORE INTO "+table+" (";
     for(size_t i=0;i<cols.size();++i){ q += cols[i]; if(i+1<cols.size()) q += ","; }
     q += ") VALUES (" + placeholders + ");";
 
@@ -117,9 +117,31 @@ static void bulk_insert_from_csv(sqlite3* db, const fs::path& file, const string
             fields.resize(cols.size());
         }
         sqlite3_reset(stmt);
-        for(size_t i=0;i<cols.size();++i){
-            // Tipado básico: si corresponde a entero/real lo dejamos a SQLite convertir.
-            bind_text((int)i+1, fields[i]);
+        for(size_t i = 0; i < cols.size(); ++i) {
+            const string& val = fields[i];
+            int col_idx = static_cast<int>(i + 1);
+
+            if (val.empty()) {
+                sqlite3_bind_null(stmt, col_idx);
+            }
+            else {
+                // Si parece un entero
+                char* end = nullptr;
+                long lval = strtol(val.c_str(), &end, 10);
+                if (*end == '\0') {
+                    sqlite3_bind_int64(stmt, col_idx, lval);
+                }
+                else {
+                    // Si parece un número real
+                    double dval = strtod(val.c_str(), &end);
+                    if (*end == '\0') {
+                        sqlite3_bind_double(stmt, col_idx, dval);
+                    } else {
+                        // Si no es número, lo tratamos como texto
+                        sqlite3_bind_text(stmt, col_idx, val.c_str(), static_cast<int>(val.size()), SQLITE_TRANSIENT);
+                    }
+                }
+            }
         }
         if(sqlite3_step(stmt) != SQLITE_DONE){
             cerr << "Fila saltada en "<< table <<": "<< sqlite3_errmsg(db) <<"\n";

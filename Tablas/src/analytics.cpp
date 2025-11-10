@@ -134,10 +134,68 @@ TimeSeries Analytics::fine_totals_per_year(){
         SUM(COALESCE(o.fine,0)) AS total_fine
         FROM incidents i
         LEFT JOIN outcomes o ON o.report_id = i.report_id
-        WHERE i.date GLOB '????-??-??'
+        WHERE i.date LIKE '____-__-__'
         GROUP BY yr
         ORDER BY yr ASC
     )SQL";
     exec_ts(db_, sql, ts);
     return ts;
+}
+
+void Analytics::run_diagnostics(std::ostream& out) {
+    out << "\n--- Diagnóstico de la base de datos ---\n";
+
+    auto run_scalar = [&](const std::string& label, const std::string& sql){
+        double val = 0;
+        try {
+            exec_scalar_double(db_, sql, val);
+            out << label << ": " << val << "\n";
+        } catch (const std::exception& e) {
+            out << "Error en " << label << ": " << e.what() << "\n";
+        }
+    };
+
+    run_scalar("Total incidents", "SELECT COUNT(*) FROM incidents");
+    run_scalar("Total details", "SELECT COUNT(*) FROM details");
+    run_scalar("Total outcomes", "SELECT COUNT(*) FROM outcomes");
+
+    run_scalar("Primer año", R"SQL(SELECT MIN(substr(date,1,4)) FROM incidents WHERE date LIKE '____-__-__')SQL");
+    run_scalar("Último año", R"SQL(SELECT MAX(substr(date,1,4)) FROM incidents WHERE date LIKE '____-__-__')SQL");
+
+    out << "\nDistribución de detection (top 5):\n";
+    ResultSetKV det;
+    exec_rs_kv(db_, R"SQL(
+        SELECT detection, COUNT(*) AS c 
+        FROM details 
+        GROUP BY detection 
+        ORDER BY c DESC 
+        LIMIT 5
+    )SQL", det);
+    for (auto& [k,v] : det.rows) out << "  " << k << ": " << v << "\n";
+
+    out << "\nDistribución de transport_mode (top 5):\n";
+    ResultSetKV tr;    
+
+    exec_rs_kv(db_, R"SQL(
+        SELECT transport_mode, COUNT(*) AS c 
+        FROM details 
+        GROUP BY transport_mode 
+        ORDER BY c DESC 
+        LIMIT 5
+    )SQL", tr);
+    for (auto& [k,v] : tr.rows) out << "  " << k << ": " << v << "\n";
+
+    run_scalar("Total personas arrestadas", "SELECT SUM(COALESCE(num_ppl_arrested,0)) FROM outcomes");
+    run_scalar("Total multas", "SELECT SUM(COALESCE(fine,0)) FROM outcomes");
+
+    out << "\nPrimeras 3 filas de incidents:\n";
+    sqlite3_stmt* stmt=nullptr;
+    if (sqlite3_prepare_v2(db_, "SELECT * FROM incidents LIMIT 3", -1, &stmt, nullptr)==SQLITE_OK) {
+        while(sqlite3_step(stmt)==SQLITE_ROW) {
+            out << "  " << sqlite3_column_text(stmt,0) << " | "
+                << sqlite3_column_text(stmt,1) << " | "
+                << sqlite3_column_text(stmt,2) << "\n";
+        }
+        sqlite3_finalize(stmt);
+    }
 }

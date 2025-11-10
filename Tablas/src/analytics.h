@@ -26,7 +26,7 @@ public:
     ResultSetKV detection_by_avg_arrests(size_t topN=10);
     ResultSetKV categories_with_longest_sentences_days(size_t topN=10);
     TimeSeries fine_totals_per_year();
-
+    void run_diagnostics(std::ostream& out);
 
 private:
     sqlite3* db_ {nullptr};
