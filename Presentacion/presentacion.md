@@ -316,7 +316,7 @@ Esto nos permite **evitar ETLs pesados**, manteniendo la lógica de limpieza **c
 ### (d) Categorías con **mayores sentencias** (en días)
 
 <p align="center">
-  <img src="../Tablas/outputs/c_detection_avg_arrests.png" alt="Incidentes 2018–2020" width="40%">
+  <img src="../Tablas/outputs/d_categories_longest_sentences_days.png" alt="Incidentes 2018–2020" width="40%">
 </p>
 
 **Qué muestra:** Promedio de días de prisión por **categoría** del incidente (normalizando años/meses/semanas a días).
